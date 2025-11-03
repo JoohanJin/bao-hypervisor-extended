@@ -1,0 +1,37 @@
+name: RISC-V Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+
+  build-riscv:
+    runs-on: ubuntu-latest
+    container: baoproject/bao:latest
+    strategy:
+      matrix:
+        platform: [
+          "qemu-riscv64-virt",
+        ]
+        irqc: [
+          "PLIC",
+          "APLIC",
+          "AIA",
+        ]
+        ipic: [
+          "IPIC_SBI",
+          "IPIC_ACLINT",
+        ]
+        cross_compile: [
+            "",
+            "CROSS_COMPILE=clang",
+        ]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - run: make PLATFORM=${{ matrix.platform }} IRQC=${{ matrix.irqc }} \
+            IPIC=${{ matrix.ipic }} CONFIG=null ${{ matrix.cross_compile }}
