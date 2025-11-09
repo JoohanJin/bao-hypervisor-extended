@@ -15,6 +15,8 @@ typedef struct {
 
 static const spinlock_t SPINLOCK_INITVAL = { 0, 0 };
 
+#ifdef __riscv
+
 static inline void spin_lock(spinlock_t* lock)
 {
     uint32_t const INCR = 1;
@@ -39,5 +41,24 @@ static inline void spin_unlock(spinlock_t* lock)
     __asm__ volatile("fence rw, rw\n\t"
                      "sw %1, %0 \n\t" : "=A"(lock->ticket) : "r"(update_lock) : "memory");
 }
+
+#else
+
+/*
+ * Host-side tools (e.g., config generators) may include this header while being
+ * compiled for a non-RISC-V target. Provide no-op stubs so those utilities can
+ * be built without needing a RISC-V inline-asm aware compiler.
+ */
+static inline void spin_lock(spinlock_t* lock)
+{
+    (void)lock;
+}
+
+static inline void spin_unlock(spinlock_t* lock)
+{
+    (void)lock;
+}
+
+#endif /* __riscv */
 
 #endif /* __ARCH_SPINLOCK__ */
