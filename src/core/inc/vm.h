@@ -18,6 +18,22 @@
 #include <io.h>
 #include <ipc.h>
 
+/**
+ * Criticality levels for Mixed-Criticality Systems (MCS)
+ * 
+ * Used to classify VMs by safety importance, enabling differentiated
+ * isolation policies and resource prioritization.
+ * 
+ * Alignment with safety standards:
+ *   CRIT_LOW  -> IEC 61508 SIL-0/1, ISO 26262 QM/ASIL-A
+ *   CRIT_HIGH -> IEC 61508 SIL-3/4, ISO 26262 ASIL-C/D
+ */
+enum vm_criticality {
+    /* keep the crticality level upto two for now for simplicity */
+    CRIT_LOW  = 0,   /**< Non-safety or low-safety critical workloads */
+    CRIT_HIGH = 1,   /**< Safety-critical workloads requiring strong isolation */
+};
+
 struct vm_mem_region {
     paddr_t base;
     size_t size;
@@ -84,6 +100,12 @@ struct vm {
 
     size_t ipc_num;
     struct ipc *ipcs;
+
+    /**
+     * Cached criticality level from configuration.
+     * Used for runtime policy decisions (isolation, scheduling, fault handling).
+     */
+    enum vm_criticality criticality;
 };
 
 struct vcpu {

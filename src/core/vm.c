@@ -16,6 +16,9 @@ static void vm_master_init(struct vm* vm, const struct vm_config* config, vmid_t
     vm->cpu_num = config->platform.cpu_num;
     vm->id = vm_id;
 
+    /* Initialize criticality level from configuration */
+    vm->criticality = config->criticality;
+
     cpu_sync_init(&vm->sync, vm->cpu_num);
 
     vm_mem_prot_init(vm, config);

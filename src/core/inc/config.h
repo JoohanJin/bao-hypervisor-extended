@@ -53,6 +53,8 @@
 /* CONFIG_HEADER is just defined for compatibility with older configs */
 #define CONFIG_HEADER
 
+/* Note: enum vm_criticality is defined in vm.h */
+
 struct vm_config {
     /**
      * To setup the image field either the VM_IMAGE_BUILTIN or VM_IMAGE_LOADED
@@ -95,6 +97,14 @@ struct vm_config {
      */
 
     struct vm_platform platform;
+
+    /**
+     * Criticality level for Mixed-Criticality Systems (MCS).
+     * Determines isolation policies, resource prioritization, and 
+     * fault handling behavior for this VM.
+     * Default: CRIT_LOW if not explicitly specified.
+     */
+    enum vm_criticality criticality;
 
 };
 
