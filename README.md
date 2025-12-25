@@ -1,117 +1,84 @@
-# Bao - a lightweight static partitioning hypervisor
+# Bao Hypervisor – Program Overview
 
+This private fork of the Bao hypervisor tracks a research and engineering program focused on reinforcing isolation, interrupt latency, and memory determinism on RISC-V platforms. The groundwork remains Bao's lightweight static-partitioning hypervisor core, while this repository layers planning for new architectural features, validation harnesses, and safety evidence.
 
-Introduction
-------------
+## Why Bao
+- **Minimal static partitioning hypervisor** providing 1:1 vCPU:pCPU mapping, pass-through devices, and two-stage memory translation.
+- **Strong isolation & real-time focus** suited for mixed-criticality systems in automotive, avionics, and industrial deployments.
+- **Small TCB**: no dependence on privileged general-purpose operating systems.
 
-**Bao** (from Mandarin Chinese “bǎohù”, meaning “to protect”) is a lightweight, 
-open-source embedded hypervisor which aims at providing strong isolation and 
-real-time guarantees. Bao provides a minimal, from-scratch implementation of 
-the partitioning hypervisor architecture. 
+Supported platforms mirror upstream Bao (Armv8 A/R, Armv7, RISC-V RV32/64, Tricore, Renesas), but current work is centered on RISC-V `virt` targets.
 
-Designed mainly for targeting mixed-criticality systems, Bao strongly focuses 
-on isolation for fault-containment and real-time behavior. Its implementation 
-comprises only a minimal, thin-layer of privileged software leveraging ISA 
-virtualization support to implement the static partitioning hypervisor architecture: 
-resources are statically partitioned and assigned at VM instantiation time; 
-memory is statically assigned using 2-stage translation; IO is pass-through only; 
-virtual interrupts are directly mapped to physical ones; and it implements a 1-1 
-mapping of virtual to physical CPUs, with no need for a scheduler. 
+## Current Priorities
+The roadmap is captured in `docs/roadmap/priorities-and-milestones.md` and centers on:
+1. **DMA isolation via IOMMU** – introduce per-VM domains and device attach workflows.
+2. **Bounded-latency interrupt delivery** – leverage RISC-V Advanced Interrupt Architecture (AIA) with MSI routing direct to VS-mode and latency instrumentation.
+3. **Memory determinism hardening** – add page-coloring, bandwidth controls, and disaster-control strategies for faulty memory or rogue interrupt sources.
+4. **RSA-like Memory Fault Manager** (not yet decided) - add the SIF to manage the hardware memory fault.
 
-Bao has no external dependencies, such as on privileged VMs running untrustable, 
-large monolithic general-purpose operating systems (e.g., Linux), and, as such, 
-encompasses a much smaller TCB.
+## Repository Additions
+Recent scaffolding organizes implementation and evidence work without altering the upstream source layout.
 
-**NOTE**: This is work in progress! Don't expect things to be complete. 
-Use at your own risk.
+- `src/arch/riscv/iommu/` – placeholder for the RISC-V IOMMU driver stack.
+- `src/arch/riscv/aia/` – staging for AIA support and interrupt-latency hooks.
+- `configs/extensions/` – reusable configuration fragments to exercise new features.
+- `scripts/qemu/` – harness scripts for QEMU `virt` experiments and measurement automation.
+- `docs/roadmap/` – priorities and milestone tracking.
+- `docs/deliverables/` – top-level hub for:
+  - **Bao enhancements** (`docs/deliverables/bao/`)
+  - **Safety artifacts** (`docs/deliverables/safety-artifacts/` with hazard, FFI, WCRT, DMA negative-test, and config checklist placeholders)
+  - **Write-up materials** (`docs/deliverables/write-up/` for IRQ/DMA diagrams, timing histograms, RT budget tables, and supporting pasted content)
 
+Each area currently hosts README placeholders to guide future content drops (no implementation code is committed yet).
 
-Supported Platforms
--------------------
+## Building the Hypervisor
+Bao remains a make-based project. Typical flow for a RISC-V QEMU bring-up:
 
-The full list of supported (and work in progress) 
-platforms is presented below:
+```bash
+# Example toolchain prefix (update to your environment)
+export CROSS_COMPILE=riscv64-unknown-elf-
 
-**Armv8-A AArch64**
-- [x] Xilinx Zynq UltraScale+ MPSoC ZCU102/4
-- [x] Ultra96 Zynq UltraScale+ ZU3EG
-- [x] NXP MCIMX8QM-CPU
-- [x] NVIDIA Jetson TX2
-- [x] 96Boards HiKey 960
-- [x] Raspberry Pi 4
-- [x] QEMU virt
-- [x] Arm Fixed Virtual Platforms
-- [ ] BeagleBone AI-64
-- [ ] NXP MCIMX8M-EVK
-- [ ] 96Boards ROCK960
+# Build Bao with two guest VMs using the example config
+make PLATFORM=qemu-riscv64-virt CONFIG=example
+```
 
-**Armv7-A / Armv8-A AArch32**
-- [x] Arm Fixed Virtual Platforms
-- [ ] QEMU virt
-- [ ] STM32MP157-DK2
+Key points:
+- `PLATFORM` must refer to a directory under `src/platform/`.
+- `CONFIG` points to a C source under `configs/` (or a subdirectory with `config.c`).
+- Outputs land in `build/<platform>/<config>/` and `bin/<platform>/<config>/` as ELF and binary images.
+- `CONFIG_REPO` can redirect configuration sources outside the repo when integrating product assets.
 
-**Armv8-R AArch64**
-- [x] Arm Fixed Virtual Platforms
+Consult upstream Bao documentation for board-specific instructions: https://bao-project.readthedocs.io/.
 
-**Armv8-R AArch32**
-- [x] Arm Fixed Virtual Platforms
-- [ ] NXP S32Z/E
-- [ ] Renesas RZT2M
+## Validation & Measurement Plan
+The deliverables roadmap introduces:
+- **IOMMU isolation tests**: negative DMA scenarios, per-device domain verification.
+- **Latency harness**: direct MSI routing, timestamp hooks, WCRT analysis with histogram capture.
+- **Determinism tooling**: page-coloring utilities, bandwidth throttling experiments, and WCET comparison reporting.
 
-**RISC-V RV64**
-- [x] QEMU virt 
-- [ ] Rocket w/ H-extension 
-- [ ] CVA6 w/ H-extension 
+Artifacts from these activities will populate the `docs/deliverables/` tree as they are produced.
 
-**RISC-V RV32**
-- [ ] QEMU virt
+## Safety Case Slice
+Safety objectives align with IEC 61508 / ISO 26262 and ARINC partitioning claims. The evidence chain will link hazard IDs to goals, requirements, controls, and observations. Placeholders are ready for:
+- Hazard log
+- Freedom-from-interference (FFI) argument
+- WCRT plots
+- Configuration lock-down checklist
 
-Community Resources
--------------------
+## References
+1. José Martins et al., "Bao: A Lightweight Static Partitioning Hypervisor for Modern Multi-Core Embedded Systems," NG-RES 2020.
+2. José Martins and Sandro Pinto, "Bao: a modern lightweight embedded hypervisor," Embedded World 2020.
+3. José Martins and Sandro Pinto, "Static Partitioning Virtualization on RISC-V," RISC-V Summit 2020.
+4. Bruno Sá et al., "A First Look at RISC-V Virtualization from an Embedded Systems Perspective," IEEE Transactions on Computers, 2021.
+5. Samuel Pereira et al., "Bao-Enclave: Virtualization-based Enclaves for Arm," 2022.
+6. José Martins and Sandro Pinto, "Shedding Light on Static Partitioning Hypervisors for Arm-based Mixed-Criticality Systems," RTAS 2023.
+7. José Martins and Sandro Pinto, "Porting of a Static Partitioning Hypervisor to Arm's Cortex-R52," EOSS 2023.
+8. David Cerdeira and José Martins, "Hello 'Bao' World" Tutorial, Bao Half-Day Workshop 2023.
+9. João Peixoto et al., "BiRtIO: VirtIO for Real-Time Network Interface Sharing on the Bao Hypervisor," IEEE Access, 2024.
+10. Hidemasa Kawasaki and Soramichi Akiyama, "Running Bao Hypervisor on gem5," gem5 blog, 2024.
 
-Project website:
+## License
+Bao is distributed under the Apache 2.0 license (see `LICENSE`).
 
- - http://www.bao-project.org/ 
-
-Source code:
-
- - https://github.com/bao-project/bao-hypervisor.git
- - git@github.com:bao-project/bao-hypervisor.git
-
- Contributing:
- 
- - Please get in touch (info@bao-project.org)
-
-
-
-Demos
-------------
-
-For a step-by-step guide on how to run different demo configurations 
-of the Bao hypervisor featuring multiple guest operating systems and 
-targeting several platforms please refer to:
-[**Bao Hypervisor Demo Guide**](https://github.com/bao-project/bao-demos)
-
-
-
-References
-------------
-
-1. José Martins, Adriano Tavares, Marco Solieri, Marko Bertogna, and Sandro Pinto. 
-"**Bao: A Lightweight Static Partitioning Hypervisor for Modern Multi-Core Embedded 
-Systems**". In Workshop on Next Generation Real-Time Embedded Systems (NG-RES 2020). 
-Schloss Dagstuhl-Leibniz-Zentrum für Informatik. 2020.
-https://drops.dagstuhl.de/opus/volltexte/2020/11779/
-
-2. José Martins and Sandro Pinto. "**Bao: a modern lightweight embedded hypervisor**".
-In Proceedings of the Embedded World Conference, Nuremberg, Germany, 2020. 
-
-3. José Martins and Sandro Pinto. "**Static Partitioning Virtualization on RISC-V**".
-In RISC-V Summit, virtual, 2020. https://www.youtube.com/watch?v=yuxMn4ZApEM
-
-4. Bruno Sá, José Martins and Sandro Pinto. "**A First Look at RISC-V Virtualization from an Embedded Systems Perspective**".
-In IEEE Transactions on Computers, doi: 10.1109/TC.2021.3124320.
-
-5. Samuel Pereira, João Sousa, Sandro Pinto, José Martins, David Cerdeira "**Bao-Enclave: Virtualization-based Enclaves for Arm**.
-In https://arxiv.org/abs/2209.05572
-
+## Change Log
+All repository setup actions are logged in date-stamped files such as `2025-11-06_v1.log`, capturing timestamps, operation types, and descriptions for traceability.
