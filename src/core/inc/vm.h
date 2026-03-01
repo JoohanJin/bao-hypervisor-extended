@@ -29,7 +29,6 @@
  *   CRIT_HIGH -> IEC 61508 SIL-3/4, ISO 26262 ASIL-C/D
  */
 enum vm_criticality {
-    /* keep the crticality level upto two for now for simplicity */
     CRIT_LOW  = 0,   /**< Non-safety or low-safety critical workloads */
     CRIT_HIGH = 1,   /**< Safety-critical workloads requiring strong isolation */
 };
