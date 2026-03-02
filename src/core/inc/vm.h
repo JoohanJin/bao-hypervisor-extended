@@ -18,6 +18,21 @@
 #include <io.h>
 #include <ipc.h>
 
+/**
+ * Criticality levels for Mixed-Criticality Systems (MCS)
+ *
+ * Used to classify VMs by safety importance, enabling differentiated
+ * isolation policies and resource prioritization.
+ *
+ * Alignment with safety standards:
+ *   CRIT_LOW  -> IEC 61508 SIL-0/1, ISO 26262 QM/ASIL-A
+ *   CRIT_HIGH -> IEC 61508 SIL-3/4, ISO 26262 ASIL-C/D
+ */
+enum vm_criticality {
+    CRIT_LOW  = 0,   /**< Non-safety or low-safety critical workloads */
+    CRIT_HIGH = 1,   /**< Safety-critical workloads requiring strong isolation */
+};
+
 struct vm_mem_region {
     paddr_t base;
     size_t size;
@@ -26,15 +41,25 @@ struct vm_mem_region {
     paddr_t phys;
 };
 
+/**
+ * Per-interrupt metadata for Mixed-Criticality Systems.
+ * Each interrupt carries its own criticality tag so that IRQs with different
+ * safety requirements can coexist within the same device region.
+ */
+struct vm_irq {
+    irqid_t id;                       /**< Hardware interrupt ID */
+    enum vm_criticality criticality;  /**< Safety level of this interrupt */
+};
+
 struct vm_dev_region {
     paddr_t pa;
     vaddr_t va;
     size_t size;
     size_t interrupt_num;
-    irqid_t *interrupts;
+    struct vm_irq *interrupts;  /**< Interrupt list with per-IRQ criticality */
     streamid_t id; /* bus master id for iommu effects */
 };
-    
+
 struct vm_platform {
     size_t cpu_num;
 
@@ -48,7 +73,7 @@ struct vm_platform {
     struct vm_dev_region *devs;
 
     // /**
-    //  * In MPU-based platforms which might also support virtual memory 
+    //  * In MPU-based platforms which might also support virtual memory
     //  * (i.e. aarch64 cortex-r) the hypervisor sets up the VM using an MPU by
     //  * default. If the user wants this VM to use the MMU they must set the
     //  * config mmu parameter to true;
@@ -84,6 +109,12 @@ struct vm {
 
     size_t ipc_num;
     struct ipc *ipcs;
+
+    /**
+     * Cached criticality level from configuration.
+     * Used for runtime policy decisions (isolation, scheduling, fault handling).
+     */
+    enum vm_criticality criticality;
 };
 
 struct vcpu {

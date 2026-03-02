@@ -1,84 +1,143 @@
-# Bao Hypervisor – Program Overview
+# Bao Hypervisor – MCS Extensions Fork
 
-This private fork of the Bao hypervisor tracks a research and engineering program focused on reinforcing isolation, interrupt latency, and memory determinism on RISC-V platforms. The groundwork remains Bao's lightweight static-partitioning hypervisor core, while this repository layers planning for new architectural features, validation harnesses, and safety evidence.
+This fork of the Bao hypervisor implements **Mixed-Criticality Systems (MCS)** extensions for a Final Year Project (FYP) research program. The goal is to add criticality-aware isolation, interrupt determinism, and fault containment mechanisms aligned with safety standards (IEC 61508, ISO 26262).
 
-## Why Bao
-- **Minimal static partitioning hypervisor** providing 1:1 vCPU:pCPU mapping, pass-through devices, and two-stage memory translation.
-- **Strong isolation & real-time focus** suited for mixed-criticality systems in automotive, avionics, and industrial deployments.
-- **Small TCB**: no dependence on privileged general-purpose operating systems.
+## Project Overview
 
-Supported platforms mirror upstream Bao (Armv8 A/R, Armv7, RISC-V RV32/64, Tricore, Renesas), but current work is centered on RISC-V `virt` targets.
+**Objective:** Extend Bao's static partitioning hypervisor with MCS features to achieve **Freedom From Interference (FFI)** between VMs of different criticality levels.
 
-## Current Priorities
-The roadmap is captured in `docs/roadmap/priorities-and-milestones.md` and centers on:
-1. **DMA isolation via IOMMU** – introduce per-VM domains and device attach workflows.
-2. **Bounded-latency interrupt delivery** – leverage RISC-V Advanced Interrupt Architecture (AIA) with MSI routing direct to VS-mode and latency instrumentation.
-3. **Memory determinism hardening** – add page-coloring, bandwidth controls, and disaster-control strategies for faulty memory or rogue interrupt sources.
-4. **RSA-like Memory Fault Manager** (not yet decided) - add the SIF to manage the hardware memory fault.
+**Target Platform:** RISC-V 64-bit (QEMU virt machine, with future hardware targets)
 
-## Repository Additions
-Recent scaffolding organizes implementation and evidence work without altering the upstream source layout.
+**Development Environment:** macOS Apple Silicon → RISC-V cross-compilation
 
-- `src/arch/riscv/iommu/` – placeholder for the RISC-V IOMMU driver stack.
-- `src/arch/riscv/aia/` – staging for AIA support and interrupt-latency hooks.
-- `configs/extensions/` – reusable configuration fragments to exercise new features.
-- `scripts/qemu/` – harness scripts for QEMU `virt` experiments and measurement automation.
-- `docs/roadmap/` – priorities and milestone tracking.
-- `docs/deliverables/` – top-level hub for:
-  - **Bao enhancements** (`docs/deliverables/bao/`)
-  - **Safety artifacts** (`docs/deliverables/safety-artifacts/` with hazard, FFI, WCRT, DMA negative-test, and config checklist placeholders)
-  - **Write-up materials** (`docs/deliverables/write-up/` for IRQ/DMA diagrams, timing histograms, RT budget tables, and supporting pasted content)
+## Why Bao for MCS
+- **Minimal static partitioning hypervisor** providing 1:1 vCPU:pCPU mapping, pass-through devices, and two-stage memory translation
+- **Strong isolation & real-time focus** suited for mixed-criticality systems in automotive, avionics, and industrial deployments
+- **Small TCB (~10K SLOC)**: no dependence on privileged general-purpose operating systems
+- **Deterministic behavior**: no dynamic resource allocation at runtime
 
-Each area currently hosts README placeholders to guide future content drops (no implementation code is committed yet).
+## MCS Extension Roadmap
 
-## Building the Hypervisor
-Bao remains a make-based project. Typical flow for a RISC-V QEMU bring-up:
+### Phase 1: Criticality Levels ✅ (Implemented)
+- Added `enum vm_criticality { CRIT_LOW, CRIT_HIGH }` to VM configuration
+- Each VM is assigned a criticality level at boot time
+- Foundation for criticality-aware resource management
 
-```bash
-# Example toolchain prefix (update to your environment)
-export CROSS_COMPILE=riscv64-unknown-elf-
+**Files modified:**
+- `src/core/inc/vm.h` – Criticality enum and field in `struct vm`
+- `src/core/inc/config.h` – Criticality field in `struct vm_config`
+- `src/core/vm.c` – Initialization in `vm_master_init()`
 
-# Build Bao with two guest VMs using the example config
-make PLATFORM=qemu-riscv64-virt CONFIG=example
+### Phase 2: IRQ Budget & Rate Limiting (Planned)
+- Per-VM interrupt budgets with configurable limits
+- Rate limiting to prevent low-criticality VMs from starving high-criticality VMs
+- Interrupt accounting and throttling mechanisms
+
+**Planned additions:**
+```c
+struct vm_config {
+    // ...
+    uint32_t irq_budget;        // Max IRQs per time window
+    uint32_t irq_window_ms;     // Time window in milliseconds
+};
 ```
 
-Key points:
-- `PLATFORM` must refer to a directory under `src/platform/`.
-- `CONFIG` points to a C source under `configs/` (or a subdirectory with `config.c`).
-- Outputs land in `build/<platform>/<config>/` and `bin/<platform>/<config>/` as ELF and binary images.
-- `CONFIG_REPO` can redirect configuration sources outside the repo when integrating product assets.
+### Phase 3: IOMMU Integration (Planned)
+- Per-VM DMA isolation using RISC-V IOMMU
+- Device-to-VM binding with address space protection
+- Prevent DMA attacks from compromising high-criticality VMs
 
-Consult upstream Bao documentation for board-specific instructions: https://bao-project.readthedocs.io/.
+### Phase 4: Health Monitor (Planned)
+- Monitor VM health and detect failures
+- Optional automatic restart of failed low-criticality VMs
+- Preserve high-criticality VM operation during recovery
+
+## Safety Standards Alignment
+
+| Requirement | IEC 61508 | ISO 26262 | Bao MCS Implementation |
+|-------------|-----------|-----------|------------------------|
+| Spatial isolation | SIL 3/4 | ASIL D | Two-stage MMU, IOMMU |
+| Temporal isolation | SIL 3/4 | ASIL D | IRQ budgets, rate limiting |
+| Criticality separation | Table A.2 | Part 9 | Criticality levels per VM |
+| Fault containment | Clause 7.4 | Part 6 | Health Monitor, VM restart |
+
+## Repository Structure
+
+```
+src/
+├── core/
+│   ├── inc/
+│   │   ├── vm.h          # VM struct with criticality field
+│   │   └── config.h      # VM config with criticality
+│   └── vm.c              # VM initialization
+├── arch/riscv/
+│   ├── iommu.c           # IOMMU driver (stub)
+│   └── ...
+└── ...
+```
+
+## Current Branch: `dev-criticality_level`
+
+This branch contains the Phase 1 implementation of criticality levels.
+
+## Building & Testing
+
+### Quick Start (using bao-demos)
+The easiest way to build and test is using the companion `bao-demos` repository:
+
+```bash
+cd /path/to/bao-demos
+./build.sh      # Build OpenSBI, Bao, and baremetal guest
+./deploy.sh     # Launch QEMU emulation
+./cleanup.sh    # Clean all build artifacts
+```
+
+### Manual Build
+```bash
+export CROSS_COMPILE=riscv64-unknown-elf-
+make PLATFORM=qemu-riscv64-virt CONFIG=baremetal
+```
+
+### VM Configuration with Criticality
+```c
+// In your config.c
+struct vm_config vm0 = {
+    .entry = 0x80200000,
+    .criticality = CRIT_HIGH,  // High-criticality VM
+    .platform = { ... },
+    // ...
+};
+```
+
+## Testing the MCS Extensions
+
+### Test 1: Criticality Level Assignment
+Verify VMs are assigned correct criticality levels at boot.
+
+### Test 2: IRQ Rate Limiting (Phase 2)
+- Configure low-crit VM with IRQ budget
+- Generate interrupt storm
+- Verify high-crit VM latency unaffected
+
+### Test 3: Fault Isolation (Phase 4)
+- Inject fault in low-crit VM
+- Verify high-crit VM continues operation
+- Observe Health Monitor recovery
 
 ## Validation & Measurement Plan
-The deliverables roadmap introduces:
-- **IOMMU isolation tests**: negative DMA scenarios, per-device domain verification.
-- **Latency harness**: direct MSI routing, timestamp hooks, WCRT analysis with histogram capture.
-- **Determinism tooling**: page-coloring utilities, bandwidth throttling experiments, and WCET comparison reporting.
-
-Artifacts from these activities will populate the `docs/deliverables/` tree as they are produced.
-
-## Safety Case Slice
-Safety objectives align with IEC 61508 / ISO 26262 and ARINC partitioning claims. The evidence chain will link hazard IDs to goals, requirements, controls, and observations. Placeholders are ready for:
-- Hazard log
-- Freedom-from-interference (FFI) argument
-- WCRT plots
-- Configuration lock-down checklist
+- **IOMMU isolation tests**: negative DMA scenarios, per-device domain verification
+- **Latency harness**: timestamp hooks, WCRT analysis with histogram capture
+- **Determinism tooling**: bandwidth throttling experiments, WCET comparison
 
 ## References
 1. José Martins et al., "Bao: A Lightweight Static Partitioning Hypervisor for Modern Multi-Core Embedded Systems," NG-RES 2020.
 2. José Martins and Sandro Pinto, "Bao: a modern lightweight embedded hypervisor," Embedded World 2020.
 3. José Martins and Sandro Pinto, "Static Partitioning Virtualization on RISC-V," RISC-V Summit 2020.
-4. Bruno Sá et al., "A First Look at RISC-V Virtualization from an Embedded Systems Perspective," IEEE Transactions on Computers, 2021.
-5. Samuel Pereira et al., "Bao-Enclave: Virtualization-based Enclaves for Arm," 2022.
-6. José Martins and Sandro Pinto, "Shedding Light on Static Partitioning Hypervisors for Arm-based Mixed-Criticality Systems," RTAS 2023.
-7. José Martins and Sandro Pinto, "Porting of a Static Partitioning Hypervisor to Arm's Cortex-R52," EOSS 2023.
-8. David Cerdeira and José Martins, "Hello 'Bao' World" Tutorial, Bao Half-Day Workshop 2023.
-9. João Peixoto et al., "BiRtIO: VirtIO for Real-Time Network Interface Sharing on the Bao Hypervisor," IEEE Access, 2024.
-10. Hidemasa Kawasaki and Soramichi Akiyama, "Running Bao Hypervisor on gem5," gem5 blog, 2024.
+4. Bruno Sá et al., "A First Look at RISC-V Virtualization from an Embedded Systems Perspective," IEEE TC 2021.
+5. José Martins and Sandro Pinto, "Shedding Light on Static Partitioning Hypervisors for Arm-based Mixed-Criticality Systems," RTAS 2023.
 
 ## License
-Bao is distributed under the Apache 2.0 license (see `LICENSE`).
+Bao is distributed under GPLv2 (see `LICENSE`). This fork's extensions follow the same license.
 
-## Change Log
-All repository setup actions are logged in date-stamped files such as `2025-11-06_v1.log`, capturing timestamps, operation types, and descriptions for traceability.
+## Author
+FYP Research Project – December 2025

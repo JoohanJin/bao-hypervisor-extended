@@ -12,6 +12,27 @@
 #define BAO_SPINLOCK_CONSTRAINT "+m"
 #endif
 #endif
+#ifndef BAO_SPINLOCK_CONSTRAINT
+#if defined(__riscv)
+#define BAO_SPINLOCK_CONSTRAINT BAO_SPINLOCK_CONSTRAINT
+#else
+#define BAO_SPINLOCK_CONSTRAINT "+m"
+#endif
+#endif
+#ifndef BAO_SPINLOCK_CONSTRAINT
+#if defined(__riscv)
+#define BAO_SPINLOCK_CONSTRAINT BAO_SPINLOCK_CONSTRAINT
+#else
+#define BAO_SPINLOCK_CONSTRAINT "+m"
+#endif
+#endif
+#ifndef BAO_SPINLOCK_CONSTRAINT
+#if defined(__riscv)
+#define BAO_SPINLOCK_CONSTRAINT BAO_SPINLOCK_CONSTRAINT
+#else
+#define BAO_SPINLOCK_CONSTRAINT "+m"
+#endif
+#endif
 /**
  * SPDX-License-Identifier: Apache-2.0
  * Copyright (c) Bao Project and Contributors. All rights reserved.
