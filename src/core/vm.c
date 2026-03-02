@@ -61,7 +61,7 @@ void vm_map_mem_region(struct vm* vm, struct vm_mem_region* reg)
     struct ppages *pa_ptr = NULL;
     if (reg->place_phys) {
         pa_reg = mem_ppages_get(reg->phys, n);
-        pa_reg.colors = reg->colors;        
+        pa_reg.colors = reg->colors;
         pa_ptr = &pa_reg;
     } else {
         pa_ptr = NULL;
@@ -113,7 +113,7 @@ static void vm_install_image(struct vm* vm, struct vm_mem_region* reg) {
         size_t img_sz = vm->config->image.size;
 
         if (img_base == img_load_pa) {
-            // The image is already correctly installed. Our work is done. 
+            // The image is already correctly installed. Our work is done.
             return;
         }
 
@@ -125,8 +125,8 @@ static void vm_install_image(struct vm* vm, struct vm_mem_region* reg) {
             ERROR("failed installing vm image. Image load region overlaps with"
                 " image runtime region");
         }
-    } 
-    
+    }
+
     size_t img_num_pages = NUM_PAGES(vm->config->image.size);
     struct ppages img_ppages =
         mem_ppages_get(vm->config->image.load_addr, img_num_pages);
@@ -181,7 +181,7 @@ static void vm_init_ipc(struct vm* vm, const struct vm_config* config)
             size = shmem->size;
             WARNING("Trying to map region to smaller shared memory. Truncated");
         }
-        
+
         spin_lock(&shmem->lock);
         shmem->cpu_masters |= (1ULL << cpu()->id);
         spin_unlock(&shmem->lock);
@@ -210,7 +210,7 @@ static void vm_init_dev(struct vm* vm, const struct vm_config* config)
         }
 
         for (size_t j = 0; j < dev->interrupt_num; j++) {
-            interrupts_vm_assign(vm, dev->interrupts[j]);
+            interrupts_vm_assign(vm, dev->interrupts[j].id);
         }
     }
 
@@ -224,7 +224,7 @@ static void vm_init_dev(struct vm* vm, const struct vm_config* config)
             }
         }
     }
-      
+
 }
 
 static struct vm* vm_allocation_init(struct vm_allocation* vm_alloc) {
@@ -290,7 +290,7 @@ void vm_emul_add_mem(struct vm* vm, struct emul_mem* emu)
 void vm_emul_add_reg(struct vm* vm, struct emul_reg* emu)
 {
     list_push(&vm->emul_reg_list, &emu->node);
-}    
+}
 
 emul_handler_t vm_emul_get_mem(struct vm* vm, vaddr_t addr)
 {
@@ -311,7 +311,7 @@ emul_handler_t vm_emul_get_reg(struct vm* vm, vaddr_t addr)
     list_foreach(vm->emul_reg_list, struct emul_reg, emu) {
         if(emu->addr == addr) {
             handler = emu->handler;
-            break; 
+            break;
         }
     }
 
