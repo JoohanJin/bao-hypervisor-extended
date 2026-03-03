@@ -1,5 +1,5 @@
 /**
- * SPDX-License-Identifier: Apache-2.0 
+ * SPDX-License-Identifier: Apache-2.0
  * Copyright (c) Bao Project and Contributors. All rights reserved.
  */
 
@@ -80,7 +80,7 @@ static bool vplic_get_hw(struct vcpu* vcpu, irqid_t id)
     return ret;
 }
 
-static uint32_t vplic_get_theshold(struct vcpu* vcpu, int vcntxt) 
+static uint32_t vplic_get_theshold(struct vcpu* vcpu, int vcntxt)
 {
     struct vplic * vplic = &vcpu->vm->arch.vplic;
     return vplic->threshold[vcntxt];
@@ -92,7 +92,7 @@ static irqid_t vplic_next_pending(struct vcpu *vcpu, int vcntxt)
     irqid_t int_id = 0;
 
     for (size_t i = 0; i <= PLIC_MAX_INTERRUPTS; i++) {
-        if (vplic_get_pend(vcpu, i) && !vplic_get_act(vcpu, i) && 
+        if (vplic_get_pend(vcpu, i) && !vplic_get_act(vcpu, i) &&
             vplic_get_enbl(vcpu, vcntxt, i)) {
 
             uint32_t prio = vplic_get_prio(vcpu,i);
@@ -113,7 +113,7 @@ enum {UPDATE_HART_LINE};
 static void vplic_ipi_handler(uint32_t event, uint64_t data);
 CPU_MSG_HANDLER(vplic_ipi_handler, VPLIC_IPI_ID);
 
-void vplic_update_hart_line(struct vcpu* vcpu, int vcntxt) 
+void vplic_update_hart_line(struct vcpu* vcpu, int vcntxt)
 {
     int pcntxt_id = vplic_vcntxt_to_pcntxt(vcpu, vcntxt);
     struct plic_cntxt pcntxt = plic_plat_id_to_cntxt(pcntxt_id);
@@ -126,11 +126,11 @@ void vplic_update_hart_line(struct vcpu* vcpu, int vcntxt)
         }
     } else {
         struct cpu_msg msg = {VPLIC_IPI_ID, UPDATE_HART_LINE, vcntxt};
-        cpu_send_msg(pcntxt.hart_id, &msg);       
+        cpu_send_msg(pcntxt.hart_id, &msg);
     }
 }
 
-static void vplic_ipi_handler(uint32_t event, uint64_t data) 
+static void vplic_ipi_handler(uint32_t event, uint64_t data)
 {
     switch(event) {
         case UPDATE_HART_LINE:
@@ -139,7 +139,7 @@ static void vplic_ipi_handler(uint32_t event, uint64_t data)
     }
 }
 
-static void vplic_set_threshold(struct vcpu* vcpu, int vcntxt, uint32_t threshold) 
+static void vplic_set_threshold(struct vcpu* vcpu, int vcntxt, uint32_t threshold)
 {
     struct vplic * vplic = &vcpu->vm->arch.vplic;
     spin_lock(&vplic->lock);
@@ -194,11 +194,26 @@ static void vplic_set_prio(struct vcpu *vcpu, irqid_t id, uint32_t prio)
 
 static irqid_t vplic_claim(struct vcpu *vcpu, int vcntxt)
 {
-    spin_lock(&vcpu->vm->arch.vplic.lock);
+    struct vplic *vplic = &vcpu->vm->arch.vplic;
+    spin_lock(&vplic->lock);
     irqid_t int_id = vplic_next_pending(vcpu, vcntxt);
-    bitmap_clear(vcpu->vm->arch.vplic.pend, int_id);
-    bitmap_set(vcpu->vm->arch.vplic.act, int_id);
-    spin_unlock(&vcpu->vm->arch.vplic.lock);
+    bitmap_clear(vplic->pend, int_id);
+    bitmap_set(vplic->act, int_id);
+
+    /* ---- Drain deferred IRQs that now have tokens ---- */
+    for (size_t i = 1; i < PLIC_MAX_INTERRUPTS; i++) {
+        if (bitmap_get(vplic->deferred, i)) {
+            uint32_t drained = irq_bucket_drain_deferred(&vplic->buckets[i]);
+            if (drained > 0) {
+                bitmap_clear(vplic->deferred, i);
+                if (!bitmap_get(vplic->pend, i)) {
+                    bitmap_set(vplic->pend, i);
+                }
+            }
+        }
+    }
+
+    spin_unlock(&vplic->lock);
 
     vplic_update_hart_line(vcpu, vcntxt);
     return int_id;
@@ -222,7 +237,22 @@ void vplic_inject(struct vcpu *vcpu, irqid_t id)
     struct vplic * vplic = &vcpu->vm->arch.vplic;
     spin_lock(&vplic->lock);
     if (id > 0 && id <= PLIC_MAX_INTERRUPTS && !vplic_get_pend(vcpu, id)) {
-        
+
+        /* ---- Rate-limit check ---- */
+        enum irq_rl_action action = irq_bucket_consume(&vplic->buckets[id]);
+        if (action == IRQ_RL_DROPPED) {
+            /* Buffer full — discard to protect the system */
+            spin_unlock(&vplic->lock);
+            return;
+        }
+        if (action == IRQ_RL_DEFERRED) {
+            /* No tokens but buffer has space — mark for later injection */
+            bitmap_set(vplic->deferred, id);
+            spin_unlock(&vplic->lock);
+            return;
+        }
+        /* IRQ_RL_ALLOW — proceed with normal injection */
+
         bitmap_set(vplic->pend, id);
 
         if(vplic_get_hw(vcpu, id)) {
@@ -232,7 +262,7 @@ void vplic_inject(struct vcpu *vcpu, irqid_t id)
         } else {
             for(size_t i = 0; i < vplic->cntxt_num; i++) {
                 if(plic_plat_id_to_cntxt(i).mode != PRIV_S) continue;
-                if(vplic_get_enbl(vcpu, i, id) && 
+                if(vplic_get_enbl(vcpu, i, id) &&
                 vplic_get_prio(vcpu, id) > vplic_get_theshold(vcpu, i)) {
                     vplic_update_hart_line(vcpu, i);
                 }
@@ -365,6 +395,11 @@ void vplic_init(struct vm *vm, vaddr_t vplic_base)
         vm_emul_add_mem(vm, &vm->arch.vplic.plic_claimcomplte_emul);
 
         /* assumes 2 contexts per hart */
-        vm->arch.vplic.cntxt_num = vm->cpu_num * 2; 
+        vm->arch.vplic.cntxt_num = vm->cpu_num * 2;
+
+        /* ---- Initialize per-IRQ rate-limit buckets ---- */
+        for (size_t i = 0; i < PLIC_MAX_INTERRUPTS; i++) {
+            irq_bucket_init(&vm->arch.vplic.buckets[i], vm->criticality);
+        }
     }
 }
