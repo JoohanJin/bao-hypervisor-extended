@@ -20,4 +20,6 @@ test2.c
 # Unit test build artefacts
 tests/test_irq_rate_limit
 tests/test_irq_rate_limit.dSYM/
+tests/test_health_monitor
+tests/test_health_monitor.dSYM/
 
