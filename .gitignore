@@ -7,7 +7,7 @@ build/*
 
 configs/*
 !configs/configs.mk
-!configs/linker.ld 
+!configs/linker.ld
 !configs/example/
 
 # IDE
