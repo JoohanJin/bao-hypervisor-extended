@@ -17,6 +17,7 @@
 #include <bitmap.h>
 #include <io.h>
 #include <ipc.h>
+#include <health_monitor.h>
 
 /**
  * Criticality levels for Mixed-Criticality Systems (MCS)
@@ -115,6 +116,12 @@ struct vm {
      * Used for runtime policy decisions (isolation, scheduling, fault handling).
      */
     enum vm_criticality criticality;
+
+    /**
+     * Health monitoring state (heartbeat-based liveness detection).
+     * Initialized from vm_config.health during vm_master_init().
+     */
+    struct vm_health health;
 };
 
 struct vcpu {

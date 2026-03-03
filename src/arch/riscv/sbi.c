@@ -1,5 +1,5 @@
 /**
- * SPDX-License-Identifier: Apache-2.0 
+ * SPDX-License-Identifier: Apache-2.0
  * Copyright (c) Bao Project and Contributors. All rights reserved.
  */
 
@@ -10,6 +10,7 @@
 #include <bitmap.h>
 #include <fences.h>
 #include <hypercall.h>
+#include <health_monitor.h>
 
 #define SBI_EXTID_BASE (0x10)
 #define SBI_GET_SBI_SPEC_VERSION_FID (0)
@@ -176,19 +177,19 @@ struct sbiret sbi_hart_start(unsigned long hartid, unsigned long start_addr,
                              unsigned long priv)
 {
     return sbi_ecall(SBI_EXTID_HSM, SBI_HART_START_FID, hartid,
-                     start_addr, priv, 0, 0, 0);    
+                     start_addr, priv, 0, 0, 0);
 }
 
 struct sbiret sbi_hart_stop()
 {
     return sbi_ecall(SBI_EXTID_HSM, SBI_HART_STOP_FID, 0,
-                     0, 0, 0, 0, 0);   
+                     0, 0, 0, 0, 0);
 }
 
 struct sbiret sbi_hart_status(unsigned long hartid)
 {
     return sbi_ecall(SBI_EXTID_HSM, SBI_HART_STATUS_FID, hartid,
-                     0, 0, 0, 0, 0);   
+                     0, 0, 0, 0, 0);
 }
 
 static unsigned long ext_table[] = {SBI_EXTID_BASE,
@@ -214,9 +215,9 @@ void sbi_msg_handler(uint32_t event, uint64_t data)
             spin_lock(&cpu()->vcpu->arch.sbi_ctx.lock);
             if(cpu()->vcpu->arch.sbi_ctx.state == START_PENDING) {
                 vcpu_arch_reset(cpu()->vcpu, cpu()->vcpu->arch.sbi_ctx.start_addr);
-                vcpu_writereg(cpu()->vcpu, REG_A1, cpu()->vcpu->arch.sbi_ctx.priv); 
+                vcpu_writereg(cpu()->vcpu, REG_A1, cpu()->vcpu->arch.sbi_ctx.priv);
                 cpu()->vcpu->arch.sbi_ctx.state = STARTED;
-            } 
+            }
             spin_unlock(&cpu()->vcpu->arch.sbi_ctx.lock);
         } break;
         default:
@@ -240,8 +241,25 @@ struct sbiret sbi_time_handler(unsigned long fid)
 
 void sbi_timer_irq_handler()
 {
+    /* Health monitor: check the current VM's liveness */
+    if (cpu()->vcpu && cpu()->vcpu->vm) {
+        health_monitor_check(cpu()->vcpu->vm);
+    }
+
     CSRS(CSR_HVIP, HIP_VSTIP);
     CSRC(sie, SIE_STIE);
+
+    /**
+     * Watchdog re-arm: if the guest is hung and stops calling
+     * sbi_set_timer(), this ensures the timer fires again so we
+     * can keep checking health.  A live guest will override this
+     * with its own sbi_set_timer() call before the watchdog fires.
+     */
+    if (cpu()->vcpu && cpu()->vcpu->vm &&
+        cpu()->vcpu->vm->health.status != VM_NOT_MONITORED) {
+        sbi_set_timer(health_rdtime() + HEALTH_WATCHDOG_TICKS);
+        CSRS(sie, SIE_STIE);
+    }
 }
 
 struct sbiret sbi_ipi_handler(unsigned long fid)
@@ -335,17 +353,17 @@ struct sbiret sbi_rfence_handler(unsigned long fid)
 }
 
 struct sbiret sbi_hsm_start_handler() {
-    
+
     struct sbiret ret;
     vcpuid_t vhart_id = vcpu_readreg(cpu()->vcpu, REG_A0);
-    
+
     if(vhart_id == cpu()->vcpu->id){
         ret.error = SBI_ERR_ALREADY_AVAILABLE;
     } else {
         struct vcpu *vcpu = vm_get_vcpu(cpu()->vcpu->vm, vhart_id);
         if(vcpu == NULL) {
             ret.error = SBI_ERR_INVALID_PARAM;
-        } else { 
+        } else {
             spin_lock(&vcpu->arch.sbi_ctx.lock);
             if (vcpu->arch.sbi_ctx.state == STARTED) {
                 ret.error = SBI_ERR_ALREADY_AVAILABLE;
@@ -366,8 +384,8 @@ struct sbiret sbi_hsm_start_handler() {
                     .data = 0xdeadbeef
                 };
                 cpu_send_msg(vcpu->phys_id, &msg);
-               
-                ret.error = SBI_SUCCESS; 
+
+                ret.error = SBI_SUCCESS;
             }
             spin_unlock(&vcpu->arch.sbi_ctx.lock);
        }
@@ -382,7 +400,7 @@ struct sbiret sbi_hsm_status_handler() {
     vcpuid_t vhart_id = vcpu_readreg(cpu()->vcpu, REG_A0);
     struct vcpu *vhart = vm_get_vcpu(cpu()->vcpu->vm, vhart_id);
 
-    if(vhart != NULL) { 
+    if(vhart != NULL) {
         ret.error = SBI_SUCCESS;
         ret.value = vhart->arch.sbi_ctx.state;
     } else {
@@ -401,13 +419,13 @@ struct sbiret sbi_hsm_handler(unsigned long fid){
             ret = sbi_hsm_start_handler();
         break;
         case SBI_HART_STATUS_FID:
-            ret = sbi_hsm_status_handler(); 
+            ret = sbi_hsm_status_handler();
         break;
         default:
             ret.error = SBI_ERR_NOT_SUPPORTED;
    }
 
-   return ret; 
+   return ret;
 }
 
 struct sbiret sbi_bao_handler(unsigned long fid){

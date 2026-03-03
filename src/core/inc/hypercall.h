@@ -11,7 +11,8 @@
 
 enum {
     HC_INVAL = 0,
-    HC_IPC = 1
+    HC_IPC = 1,
+    HC_HEARTBEAT = 2
 };
 
 enum {
@@ -21,8 +22,8 @@ enum {
     HC_E_INVAL_ARGS = 3
 };
 
-typedef unsigned long (*hypercall_handler)( unsigned long arg0, 
-                                            unsigned long arg1, 
+typedef unsigned long (*hypercall_handler)( unsigned long arg0,
+                                            unsigned long arg1,
                                             unsigned long arg2);
 
 long int hypercall(unsigned long id);

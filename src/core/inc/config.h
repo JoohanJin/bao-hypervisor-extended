@@ -100,11 +100,17 @@ struct vm_config {
 
     /**
      * Criticality level for Mixed-Criticality Systems (MCS).
-     * Determines isolation policies, resource prioritization, and 
+     * Determines isolation policies, resource prioritization, and
      * fault handling behavior for this VM.
      * Default: CRIT_LOW if not explicitly specified.
      */
     enum vm_criticality criticality;
+
+    /**
+     * Health monitoring configuration (heartbeat-based liveness).
+     * If .enabled is false (default / zero-init), the VM is not monitored.
+     */
+    struct vm_health_config health;
 
 };
 
@@ -114,8 +120,8 @@ extern struct config {
         /**
          * Only meaningful for MPU-based platforms. The hypervisor base address
          * will default to the platform's base address, i.e., the base address
-         * of the first region defined in the target platform's description. 
-         * If the user wishes to relocate it to another address, they must set 
+         * of the first region defined in the target platform's description.
+         * If the user wishes to relocate it to another address, they must set
          * relocate to true and provide the new base address.
          */
         bool relocate;

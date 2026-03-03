@@ -7,6 +7,7 @@
 #include <cpu.h>
 #include <vm.h>
 #include <ipc.h>
+#include <health_monitor.h>
 
 long int hypercall(unsigned long id) {
     long int ret = -HC_E_INVAL_ID;
@@ -18,6 +19,10 @@ long int hypercall(unsigned long id) {
     switch(id){
         case HC_IPC:
             ret = ipc_hypercall(ipc_id, arg1, arg2);
+        break;
+        case HC_HEARTBEAT:
+            health_monitor_heartbeat(cpu()->vcpu->vm);
+            ret = HC_E_SUCCESS;
         break;
         default:
             WARNING("Unknown hypercall id %d", id);

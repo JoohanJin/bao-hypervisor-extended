@@ -8,6 +8,7 @@
 #include <mem.h>
 #include <cache.h>
 #include <config.h>
+#include <health_monitor.h>
 
 static void vm_master_init(struct vm* vm, const struct vm_config* config, vmid_t vm_id)
 {
@@ -18,6 +19,9 @@ static void vm_master_init(struct vm* vm, const struct vm_config* config, vmid_t
 
     /* Initialize criticality level from configuration */
     vm->criticality = config->criticality;
+
+    /* Initialize health monitoring from configuration */
+    health_monitor_init(vm, &config->health);
 
     cpu_sync_init(&vm->sync, vm->cpu_num);
 
