@@ -10,3 +10,14 @@ configs/*
 !configs/linker.ld 
 !configs/example/
 
+# IDE
+.vscode/
+
+# Scratch files
+test.c
+test2.c
+
+# Unit test build artefacts
+tests/test_irq_rate_limit
+tests/test_irq_rate_limit.dSYM/
+
