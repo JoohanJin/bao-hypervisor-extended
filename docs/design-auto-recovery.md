@@ -406,7 +406,103 @@ in `exceptions.S` / `sync_exceptions.c`.
 
 ---
 
-## 8. Summary
+## 8. Known Limitations for Mixed-Criticality Systems
+
+### 8.1 Blocking Recovery Window
+
+The recovery process is **not instantaneous**. Between the moment
+`VM_UNHEALTHY` is detected and the moment the guest resumes execution,
+the following blocking operations occur:
+
+1. **Image re-installation** — `memcpy` copies the entire guest binary
+   from `load_addr` into the VM's runtime memory. For a non-trivial
+   guest image this can take **hundreds of microseconds to milliseconds**
+   depending on image size and memory bandwidth.
+
+2. **Multi-vCPU barrier synchronisation** — all vCPUs belonging to the
+   failed VM must reach a barrier before the image copy starts, and
+   again before they resume. If one vCPU is slow to respond to the IPI,
+   **all vCPUs spin-wait**, including any that share physical resources
+   (cache, memory bus) with other VMs.
+
+3. **Interrupt masking** — during the deferred recovery path, timer
+   interrupts for the recovering VM's CPUs are effectively blocked. If
+   the recovery is slow, watchdog timers on *other* VMs sharing the same
+   physical CPU (not applicable in the current partitioned config, but
+   possible in time-sliced / shared-CPU configs) could see timing jitter.
+
+**Impact on MCS guarantees:**
+
+In a true mixed-criticality deployment, a CRIT_HIGH VM must maintain
+bounded worst-case execution time (WCET) and interrupt latency at all
+times. The blocking recovery of a co-resident CRIT_LOW VM can violate
+these bounds because:
+
+- The `memcpy` and barrier spins consume shared bus bandwidth.
+- If recovery runs on a CPU that also hosts a CRIT_HIGH vCPU (shared-CPU
+  scenario), the CRIT_HIGH guest is paused for the duration.
+- There is **no preemption** of the recovery path — once started, it
+  runs to completion.
+
+**This is a fundamental limitation of the current design.** A
+production MCS hypervisor would require:
+
+- **Hardware-assisted memory restore** (e.g. DMA-based image copy that
+  does not stall the CPU, or checkpoint/restore at the MMU level).
+- **Non-blocking recovery** with bounded time that can be incorporated
+  into the WCET analysis of co-resident VMs.
+- **Temporal isolation** guarantees (e.g. memory bandwidth regulation,
+  cache partitioning via page colouring — Bao supports colouring but
+  not bandwidth regulation).
+- **Formal verification** that recovery cannot cause deadline misses
+  on CRIT_HIGH partitions.
+
+For this prototype / FYP scope, the recovery is implemented as a
+**best-effort mechanism** that demonstrates the concept. The blocking
+window is acceptable for the QEMU baremetal demo where:
+- Each VM is statically pinned to dedicated physical CPUs (no sharing).
+- Image sizes are small (~4–8 KB baremetal binaries).
+- There are no hard real-time deadlines to violate.
+
+### 8.2 No State Preservation
+
+Recovery performs a **full cold restart** — all guest RAM is overwritten
+with the original image, and vCPU registers are zeroed. Any in-flight
+computation, application state, or IPC message buffers are lost. This is
+equivalent to a power cycle, not a graceful restart.
+
+For stateful guests (e.g. Linux), this means:
+- File system corruption if writes were in progress.
+- Loss of network connections and application context.
+- No guarantee that the guest will reach the same operational state.
+
+A checkpoint/restore mechanism would be needed for stateful recovery,
+which is out of scope for this prototype.
+
+### 8.3 No Root-Cause Diagnosis
+
+The hypervisor detects *that* a VM failed (missed heartbeats) but not
+*why*. The guest could be:
+- Stuck in an infinite loop
+- Crashed with an unhandled exception
+- Deadlocked on a spinlock
+- Starved of CPU time by a misconfigured scheduler
+
+Recovery restarts the guest regardless. If the root cause is
+environmental (e.g. hardware fault, memory corruption), the guest will
+likely fail again immediately, consuming recovery attempts until
+`max_recoveries` is exhausted.
+
+### 8.4 Recovery Count as a Soft Bound
+
+The `max_recoveries` limit prevents infinite restart loops but is not
+a safety mechanism — it is a heuristic. A proper MCS system would
+require formal analysis of recovery frequency and its impact on system
+availability.
+
+---
+
+## 9. Summary
 
 The auto-recovery feature extends the existing health monitor with a
 lightweight restart mechanism. It reuses Bao's existing primitives:
@@ -418,3 +514,8 @@ lightweight restart mechanism. It reuses Bao's existing primitives:
 No new memory allocation, no new page table setup, no changes to the
 guest binary format. The guest simply reboots from its original entry
 point with a fresh image, as if power-cycled.
+
+**However**, the blocking nature of image re-installation and multi-vCPU
+synchronisation makes this approach unsuitable for production MCS
+deployments where bounded recovery latency must be guaranteed. See
+Section 8 for a full discussion of limitations.
