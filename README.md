@@ -21,12 +21,10 @@ This fork of the Bao hypervisor implements **Mixed-Criticality Systems (MCS)** e
 ### Phase 1: Criticality Levels ✅ (Implemented)
 - Added `enum vm_criticality { CRIT_LOW, CRIT_HIGH }` to VM configuration
 - Each VM is assigned a criticality level at boot time
-- Foundation for criticality-aware resource management
+- **IRQ Rate Limiting**: Implemented a Token Bucket algorithm that throttles interrupts based on criticality to prevent interrupt storms and ensure temporal isolation.
+- Foundation for criticality-aware resource management.
 
-**Files modified:**
-- `src/core/inc/vm.h` – Criticality enum and field in `struct vm`
-- `src/core/inc/config.h` – Criticality field in `struct vm_config`
-- `src/core/vm.c` – Initialization in `vm_master_init()`
+See [docs/criticality-levels.md](docs/criticality-levels.md) for detailed design.
 
 ### Phase 2: IRQ Budget & Rate Limiting (Planned)
 - Per-VM interrupt budgets with configurable limits

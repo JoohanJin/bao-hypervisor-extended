@@ -355,7 +355,7 @@ Extends Phase 2a with IPI-based coordination.
 ### Integration Test (QEMU)
 1. Build with auto-recovery enabled
 2. Modify one guest to **stop sending heartbeats** after N timer IRQs
-3. Observe: `HEALTH: VM X UNHEALTHY` → `RECOVERY: VM X starting` → 
+3. Observe: `HEALTH: VM X UNHEALTHY` → `RECOVERY: VM X starting` →
    `RECOVERY: VM X recovered` → guest resumes printing timer IRQs
 4. Verify the other VM is unaffected throughout
 

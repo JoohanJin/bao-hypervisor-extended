@@ -1,7 +1,7 @@
 # VM Health Monitor — Design Plan
 
 **Branch:** `dev-health-monitor`
-**Status:** Planning only — no code changes yet
+**Status:** ✅ Implemented
 
 ---
 
@@ -16,6 +16,11 @@ We need a **heartbeat-based health monitoring** facility where:
 - Guest VMs periodically signal the hypervisor that they are alive
 - The hypervisor detects missed heartbeats and flags a VM as unhealthy
 - (Future) The hypervisor can trigger recovery actions (restart, failover)
+
+### 1.1 Criticality-Aware Monitoring
+The health monitor adjusts its sensitivity based on the VM's `criticality` level:
+- **CRIT_HIGH**: Uses strict deadlines (short `timeout_ms`) and fewer `max_missed` heartbeats to trigger rapid system-level alerts or recovery.
+- **CRIT_LOW**: Uses relaxed deadlines to accommodate non-deterministic background OS tasks (like Linux kernel house-keeping) without triggering false positives.
 
 ---
 
