@@ -1,5 +1,5 @@
 /**
- * SPDX-License-Identifier: Apache-2.0 
+ * SPDX-License-Identifier: Apache-2.0
  * Copyright (c) Bao Project and Contributors. All rights reserved.
  */
 
@@ -19,6 +19,9 @@ struct platform platform = {
 
     .arch = {
         .plic_base = 0xc000000,
+        .iommu = {
+            .base = 0x3010000,  /* RISC-V IOMMU (enabled with -M virt,iommu-sys=on) */
+        },
     }
 
 };

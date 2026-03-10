@@ -5,8 +5,9 @@
 ## Run on the host (x86/ARM macOS/Linux) — not cross-compiled.
 
 CC      := cc
-CFLAGS  := -Wall -Wextra -Werror -std=c11 -g -O0
-TESTS   := test_irq_rate_limit test_health_monitor
+# Add include path for arch headers so <bao.h> resolves when building iommu test
+CFLAGS  := -Wall -Wextra -Werror -std=c11 -g -O0 -I../src/arch/riscv/inc/arch
+TESTS   := test_irq_rate_limit test_health_monitor test_iommu
 
 .PHONY: all clean test
 
