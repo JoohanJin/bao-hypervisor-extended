@@ -23,3 +23,5 @@ tests/test_irq_rate_limit.dSYM/
 tests/test_health_monitor
 tests/test_health_monitor.dSYM/
 
+tests/test_iommu
+tests/*.dSYM/
