@@ -47,3 +47,14 @@ if (irq_bucket_consume(&bucket) == IRQ_RL_ALLOW) {
     vcpu_inject_irq(vcpu, irq_id);
 }
 ```
+
+## 6. Files Modified
+
+| File | Change |
+|---|---|
+| `src/core/inc/irq_rate_limit.h` | Token bucket data structure, algorithm (init, refill, consume, drain_deferred), per-criticality defaults, `rdtime`-based cycle counter. |
+| `src/arch/riscv/vplic.c` | Integration point — `vplic_inject()` calls `irq_bucket_consume()` before forwarding IRQs to guest vPLIC. Deferred IRQs stored in bitmap. |
+| `src/arch/riscv/inc/arch/vplic.h` | Added `struct irq_token_bucket buckets[]` and `deferred` bitmap to `struct vplic`. |
+| `src/core/inc/vm.h` | `struct vm_irq` with `.criticality` field for per-interrupt rate limiter parameterization. |
+| `src/core/hypercall.c` | `HC_PLIC_INJECT` hypercall — direct rate limiter test path (bypasses vPLIC pending check). |
+| `tests/test_irq_rate_limit.c` | 17 unit tests for token bucket logic (init, consume, refill, deferred, dropped, boundary conditions). |

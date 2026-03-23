@@ -32,3 +32,14 @@ struct vm_config vm0 = {
     /* ... */
 };
 ```
+
+## 4. Files Modified
+
+| File | Change |
+|---|---|
+| `src/core/inc/vm.h` | Added `enum vm_criticality { CRIT_LOW = 0, CRIT_HIGH = 1 }` and `criticality` field to `struct vm_config`. Added `struct vm_irq` with per-interrupt criticality. |
+| `src/core/inc/config.h` | Added `criticality` field to platform config structures. |
+| `src/core/inc/irq_rate_limit.h` | Token bucket defaults keyed by criticality level (`irq_bucket_init()` selects CRIT_HIGH or CRIT_LOW parameters). |
+| `src/core/inc/health_monitor.h` | `struct vm_health_config` — criticality-aware timeout/threshold parameters per VM. |
+| `src/arch/riscv/vplic.c` | Uses per-IRQ criticality from `struct vm_irq` when initializing rate limiter buckets. |
+| `demos/benchmark/configs/*.c` | Each benchmark config sets `.criticality = CRIT_HIGH` / `CRIT_LOW` per VM. |
