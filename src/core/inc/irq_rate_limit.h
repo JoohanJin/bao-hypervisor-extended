@@ -102,7 +102,9 @@ static inline uint64_t irq_rl_read_cycles(void)
 static inline uint64_t irq_rl_read_cycles(void)
 {
     uint64_t val;
-    __asm__ volatile("rdcycle %0" : "=r"(val));
+    /* Use rdtime (CLINT timer @ 10 MHz) to match IRQ_RL_TIMER_FREQ.
+     * rdcycle runs at CPU frequency which differs from the timer. */
+    __asm__ volatile("rdtime %0" : "=r"(val));
     return val;
 }
 #endif
