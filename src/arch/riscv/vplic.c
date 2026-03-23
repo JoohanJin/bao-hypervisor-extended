@@ -239,6 +239,7 @@ void vplic_inject(struct vcpu *vcpu, irqid_t id)
     if (id > 0 && id <= PLIC_MAX_INTERRUPTS && !vplic_get_pend(vcpu, id)) {
 
         /* ---- Rate-limit check ---- */
+#ifndef BENCH_NO_RATE_LIMIT
         enum irq_rl_action action = irq_bucket_consume(&vplic->buckets[id]);
         if (action == IRQ_RL_DROPPED) {
             /* Buffer full — discard to protect the system */
@@ -252,6 +253,7 @@ void vplic_inject(struct vcpu *vcpu, irqid_t id)
             return;
         }
         /* IRQ_RL_ALLOW — proceed with normal injection */
+#endif
 
         bitmap_set(vplic->pend, id);
 

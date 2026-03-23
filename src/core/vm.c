@@ -20,8 +20,10 @@ static void vm_master_init(struct vm* vm, const struct vm_config* config, vmid_t
     /* Initialize criticality level from configuration */
     vm->criticality = config->criticality;
 
+#ifndef BENCH_NO_HEALTH_MONITOR
     /* Initialize health monitoring from configuration */
     health_monitor_init(vm, &config->health);
+#endif
 
     cpu_sync_init(&vm->sync, vm->cpu_num);
 

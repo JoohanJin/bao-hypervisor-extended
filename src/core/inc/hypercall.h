@@ -12,7 +12,8 @@
 enum {
     HC_INVAL = 0,
     HC_IPC = 1,
-    HC_HEARTBEAT = 2
+    HC_HEARTBEAT = 2,
+    HC_PLIC_INJECT = 3
 };
 
 enum {

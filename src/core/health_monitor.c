@@ -50,7 +50,10 @@ void health_monitor_heartbeat(struct vm *vm)
 
     if (vm->health.status != VM_HEALTHY) {
 #ifndef HEALTH_MONITOR_TEST
-        printk("HEALTH: VM %d recovered -> HEALTHY\n", vm->id);
+        uint64_t now_ms = health_rdtime() / (HEALTH_TIMER_FREQ / 1000);
+        printk("[HM:TRANSITION] vm=%d %s->HEALTHY t=%lu\n",
+               vm->id, health_status_str(vm->health.status),
+               (unsigned long)now_ms);
 #endif
         vm->health.status = VM_HEALTHY;
     }
@@ -79,16 +82,26 @@ void health_monitor_check(struct vm *vm)
         vm->health.status = VM_UNHEALTHY;
         if (prev != VM_UNHEALTHY) {
 #ifndef HEALTH_MONITOR_TEST
-            printk("HEALTH: VM %d UNHEALTHY (%d missed heartbeats)\n",
-                   vm->id, vm->health.missed_count);
+            uint64_t now_ms = now / (HEALTH_TIMER_FREQ / 1000);
+            uint64_t last_ms = vm->health.last_heartbeat / (HEALTH_TIMER_FREQ / 1000);
+            printk("[HM:TRANSITION] vm=%d %s->UNHEALTHY t=%lu latency=%lu missed=%d\n",
+                   vm->id, health_status_str(prev),
+                   (unsigned long)now_ms,
+                   (unsigned long)(now_ms - last_ms),
+                   vm->health.missed_count);
 #endif
         }
     } else {
         vm->health.status = VM_SUSPECT;
         if (prev == VM_HEALTHY) {
 #ifndef HEALTH_MONITOR_TEST
-            printk("HEALTH: VM %d SUSPECT (%d/%d missed)\n",
-                   vm->id, vm->health.missed_count, vm->health.max_missed);
+            uint64_t now_ms = now / (HEALTH_TIMER_FREQ / 1000);
+            uint64_t last_ms = vm->health.last_heartbeat / (HEALTH_TIMER_FREQ / 1000);
+            printk("[HM:TRANSITION] vm=%d HEALTHY->SUSPECT t=%lu latency=%lu missed=%d/%d\n",
+                   vm->id,
+                   (unsigned long)now_ms,
+                   (unsigned long)(now_ms - last_ms),
+                   vm->health.missed_count, vm->health.max_missed);
 #endif
         }
     }

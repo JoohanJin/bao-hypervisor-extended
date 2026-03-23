@@ -241,10 +241,12 @@ struct sbiret sbi_time_handler(unsigned long fid)
 
 void sbi_timer_irq_handler()
 {
+#ifndef BENCH_NO_HEALTH_MONITOR
     /* Health monitor: check the current VM's liveness */
     if (cpu()->vcpu && cpu()->vcpu->vm) {
         health_monitor_check(cpu()->vcpu->vm);
     }
+#endif
 
     CSRS(CSR_HVIP, HIP_VSTIP);
     CSRC(sie, SIE_STIE);
