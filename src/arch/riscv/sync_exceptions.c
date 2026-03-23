@@ -132,9 +132,22 @@ size_t guest_page_fault_handler()
     }
 }
 
+/**
+ * Handle virtual instruction trap (scause 22).
+ * Triggered when a VS-mode guest executes WFI or another instruction
+ * that requires HS-mode emulation. Advance past the instruction.
+ */
+static size_t virtual_instruction_handler()
+{
+    unsigned long ins = CSRR(CSR_HTINST);
+    /* If htinst is valid, use its encoded size; otherwise assume 4 bytes. */
+    return (ins != 0) ? TINST_INS_SIZE(ins) : 4;
+}
+
 sync_handler_t sync_handler_table[] = {
     [SCAUSE_CODE_ECV] = sbi_vs_handler,
     [SCAUSE_CODE_LGPF] = guest_page_fault_handler,
+    [SCAUSE_CODE_VRTI] = virtual_instruction_handler,
     [SCAUSE_CODE_SGPF] = guest_page_fault_handler,
 };
 

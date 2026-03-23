@@ -139,11 +139,54 @@ static void iommu_cmd_iofence(void)
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
+ * Fault Queue drain — read and log all pending IOMMU fault records
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+/** IOMMU fault PLIC IRQ (first of 36-39 on QEMU virt) */
+#define IOMMU_FQ_IRQ  36
+
+static void iommu_drain_fq(void)
+{
+    if (!iommu_base || !fq_entries) return;
+
+    uint32_t head = iommu_read32(RISCV_IOMMU_REG_FQH);
+    uint32_t tail = iommu_read32(RISCV_IOMMU_REG_FQT);
+
+    while (head != tail) {
+        volatile struct riscv_iommu_fq_record *rec = &fq_entries[head];
+        uint64_t cause = rec->hdr & RISCV_IOMMU_FQ_HDR_CAUSE_MSK;
+        uint64_t did   = (rec->hdr & RISCV_IOMMU_FQ_HDR_DID_MSK)
+                          >> RISCV_IOMMU_FQ_HDR_DID_OFF;
+
+        INFO("[BENCH:IOMMU:FAULT] cause=%lu dev=%lu iotval=0x%lx iotval2=0x%lx",
+             (unsigned long)cause, (unsigned long)did,
+             (unsigned long)rec->iotval, (unsigned long)rec->iotval2);
+
+        head = (head + 1) & (FQ_NUM - 1);
+    }
+
+    /* Advance head so hardware can reuse the slots */
+    iommu_write32(RISCV_IOMMU_REG_FQH, head);
+
+    /* Clear fault-interrupt-pending bit in IPSR */
+    iommu_write32(RISCV_IOMMU_REG_IPSR, RISCV_IOMMU_IPSR_FIP);
+}
+
+/* Callable from timer interrupt path or externally for on-demand drain. */
+void iommu_check_faults(void)
+{
+    iommu_drain_fq();
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
  * IOMMU Initialization
  * ═══════════════════════════════════════════════════════════════════════════ */
 
 bool iommu_arch_init(void)
 {
+#ifdef BENCH_NO_IOMMU
+    return true;  /* Benchmark: skip IOMMU — DMA passes through */
+#endif
     /* Only master CPU initializes the IOMMU, and only if platform has one. */
     if (cpu()->id != CPU_MASTER || platform.arch.iommu.base == 0) {
         return true;        /* No IOMMU — graceful fallback (pass-through). */
@@ -258,6 +301,11 @@ bool iommu_arch_init(void)
     while (iommu_read64(RISCV_IOMMU_REG_DDTP) & RISCV_IOMMU_DDTP_BUSY) {
         ;
     }
+
+    /* ── 9. Fault-queue interrupt ────────────────────────────────────────
+     * NOTE: We keep FIE disabled and drain the fault queue on-demand
+     * (from the timer path or DDT dump) to avoid PLIC IRQ conflicts
+     * with the global_interrupt_bitmap during VM device assignment.   */
 
     INFO("iommu: initialized — DDT at PA 0x%lx, mode=1LVL, CQ=%u FQ=%u entries",
          ddt_phys, CQ_NUM, FQ_NUM);
