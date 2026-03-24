@@ -115,9 +115,10 @@ static inline uint64_t irq_rl_read_cycles(void)
  * @param b           Pointer to the bucket
  * @param criticality The VM's criticality level (CRIT_LOW=0, CRIT_HIGH=1)
  */
-static inline void irq_bucket_init(struct irq_token_bucket *b,
-                                   unsigned int criticality)
-{
+static inline void irq_bucket_init(
+    struct irq_token_bucket* b,
+    unsigned int criticality
+){
     if (criticality >= 1) {
         /* CRIT_HIGH */
         b->max_tokens   = IRQ_RL_CRIT_HIGH_MAX_TOKENS;
@@ -143,7 +144,7 @@ static inline void irq_bucket_init(struct irq_token_bucket *b,
  *
  * @param b  Pointer to the bucket
  */
-static inline void irq_bucket_refill(struct irq_token_bucket *b)
+static inline void irq_bucket_refill(struct irq_token_bucket* b)
 {
     uint64_t now = irq_rl_read_cycles();
     uint64_t elapsed = now - b->last_refill;

@@ -10,6 +10,9 @@
 #include <health_monitor.h>
 #include <arch/vplic.h>
 #include <irq_rate_limit.h>
+#include <mem.h>
+#include <arch/iommu.h>
+#include <fences.h>
 
 long int hypercall(unsigned long id) {
     long int ret = -HC_E_INVAL_ID;
@@ -54,6 +57,32 @@ long int hypercall(unsigned long id) {
                        (unsigned long)inject_dropped);
             }
             ret = HC_E_SUCCESS;
+            break;
+        }
+        case HC_DMA_WRITE: {
+            paddr_t target_pa = (paddr_t)ipc_id;
+            uint32_t write_val = (uint32_t)arg1;
+
+            if (iommu_active()) {
+                INFO("[BENCH:IOMMU:DMA_BLOCKED] vm%d write 0x%x to PA 0x%lx",
+                     cpu()->vcpu->vm->id, write_val, target_pa);
+                ret = HC_E_FAILURE;
+            } else {
+                paddr_t page_pa = target_pa & ~((paddr_t)PAGE_SIZE - 1);
+                size_t  offset  = target_pa & (PAGE_SIZE - 1);
+                vaddr_t va = mem_alloc_map_dev(&cpu()->as, SEC_HYP_GLOBAL,
+                                               INVALID_VA, page_pa, 1);
+                if (va) {
+                    *(volatile uint32_t *)(va + offset) = write_val;
+                    fence_sync_write();
+                    mem_unmap(&cpu()->as, va, 1, false);
+                    INFO("[BENCH:DMA:WRITE_OK] vm%d wrote 0x%x to PA 0x%lx",
+                         cpu()->vcpu->vm->id, write_val, target_pa);
+                    ret = HC_E_SUCCESS;
+                } else {
+                    ret = HC_E_FAILURE;
+                }
+            }
             break;
         }
         default:

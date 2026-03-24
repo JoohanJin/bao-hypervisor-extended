@@ -182,6 +182,11 @@ void iommu_check_faults(void)
  * IOMMU Initialization
  * ═══════════════════════════════════════════════════════════════════════════ */
 
+bool iommu_active(void)
+{
+    return iommu_base != NULL;
+}
+
 bool iommu_arch_init(void)
 {
 #ifdef BENCH_NO_IOMMU

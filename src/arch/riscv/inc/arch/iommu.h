@@ -184,4 +184,10 @@ struct iommu_vm_arch {
 
 #define RISCV_IOMMU_DDT_1LVL_MAX_DEVS  (PAGE_SIZE / sizeof(struct riscv_iommu_dc))
 
+/**
+ * Check whether the IOMMU was successfully initialized and is active.
+ * Returns false when BENCH_NO_IOMMU is defined or no IOMMU hardware exists.
+ */
+bool iommu_active(void);
+
 #endif /* __IOMMU_ARCH_H__ */
