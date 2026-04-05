@@ -155,6 +155,7 @@ emul_handler_t vm_emul_get_mem(struct vm* vm, vaddr_t addr);
 emul_handler_t vm_emul_get_reg(struct vm* vm, vaddr_t addr);
 void vcpu_init(struct vcpu* vcpu, struct vm* vm, vaddr_t entry);
 void vm_msg_broadcast(struct vm* vm, struct cpu_msg* msg);
+void vm_reinstall_image(struct vm* vm);
 cpumap_t vm_translate_to_pcpu_mask(struct vm* vm, cpumap_t mask, size_t len);
 cpumap_t vm_translate_to_vcpu_mask(struct vm* vm, cpumap_t mask, size_t len);
 

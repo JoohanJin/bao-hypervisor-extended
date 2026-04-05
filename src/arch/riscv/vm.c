@@ -77,11 +77,9 @@ void vcpu_writepc(struct vcpu *vcpu, unsigned long pc)
 }
 
 void vcpu_arch_run(struct vcpu *vcpu){
-
     if(vcpu->arch.sbi_ctx.state == STARTED){
         vcpu_arch_entry();
     } else {
         cpu_idle();
-    }    
-
+    }
 }

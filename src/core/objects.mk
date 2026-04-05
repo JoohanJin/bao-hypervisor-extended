@@ -14,3 +14,4 @@ core-objs-y+=ipc.o
 core-objs-y+=objpool.o
 core-objs-y+=hypercall.o
 core-objs-y+=health_monitor.o
+core-objs-y+=vm_recovery.o

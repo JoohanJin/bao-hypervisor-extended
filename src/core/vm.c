@@ -288,6 +288,20 @@ struct vm* vm_init(struct vm_allocation* vm_alloc, const struct vm_config* confi
     return vm;
 }
 
+void vm_reinstall_image(struct vm* vm)
+{
+    const struct vm_config *config = vm->config;
+
+    for (size_t i = 0; i < config->platform.region_num; i++) {
+        struct vm_mem_region *reg = &config->platform.regions[i];
+        if (range_in_range(config->image.base_addr, config->image.size,
+                           reg->base, reg->size)) {
+            vm_install_image(vm, reg);
+            break;
+        }
+    }
+}
+
 void vm_emul_add_mem(struct vm* vm, struct emul_mem* emu)
 {
     list_push(&vm->emul_mem_list, &emu->node);

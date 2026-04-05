@@ -13,6 +13,7 @@
 #ifndef HEALTH_MONITOR_TEST
 #include <vm.h>
 #include <printk.h>
+#include <vm_recovery.h>
 #endif
 
 void health_monitor_init(struct vm *vm, const struct vm_health_config *cfg)
@@ -61,7 +62,8 @@ void health_monitor_heartbeat(struct vm *vm)
 
 void health_monitor_check(struct vm *vm)
 {
-    if (vm->health.status == VM_NOT_MONITORED) {
+    if (vm->health.status == VM_NOT_MONITORED ||
+        vm->health.status == VM_RECOVERING) {
         return;
     }
 
@@ -89,6 +91,7 @@ void health_monitor_check(struct vm *vm)
                    (unsigned long)now_ms,
                    (unsigned long)(now_ms - last_ms),
                    vm->health.missed_count);
+            vm_recovery_start(vm);
 #endif
         }
     } else {

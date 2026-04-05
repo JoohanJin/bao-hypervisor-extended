@@ -37,6 +37,7 @@ enum vm_health_status {
     VM_SUSPECT       = 1,  /**< 1+ missed, within grace period        */
     VM_UNHEALTHY     = 2,  /**< Exceeded max missed heartbeats        */
     VM_NOT_MONITORED = 3,  /**< Heartbeat not configured for this VM  */
+    VM_RECOVERING    = 4,  /**< Auto-recovery in progress             */
 };
 
 /* ------------------------------------------------------------------ */
@@ -49,6 +50,7 @@ struct vm_health {
     uint32_t missed_count;        /**< Consecutive missed checks       */
     uint32_t max_missed;          /**< Threshold before UNHEALTHY      */
     uint64_t heartbeat_timeout;   /**< Ticks before a check is "missed"*/
+    uint32_t recovery_count;      /**< Total recoveries performed      */
 };
 
 /* ------------------------------------------------------------------ */
@@ -60,6 +62,8 @@ struct vm_health_config {
     uint64_t heartbeat_period_ms;  /**< Expected guest heartbeat (ms)  */
     uint64_t timeout_ms;           /**< Deadline before "missed" (ms)  */
     uint32_t max_missed;           /**< Missed checks → UNHEALTHY      */
+    bool     auto_recover;         /**< Enable auto-restart on UNHEALTHY */
+    uint32_t max_recoveries;       /**< 0 = unlimited, N = stop after N  */
 };
 
 /* ------------------------------------------------------------------ */
@@ -148,6 +152,7 @@ static inline const char *health_status_str(enum vm_health_status s)
         case VM_SUSPECT:        return "SUSPECT";
         case VM_UNHEALTHY:      return "UNHEALTHY";
         case VM_NOT_MONITORED:  return "NOT_MONITORED";
+        case VM_RECOVERING:     return "RECOVERING";
         default:                return "UNKNOWN";
     }
 }
