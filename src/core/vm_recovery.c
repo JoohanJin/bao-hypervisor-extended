@@ -15,6 +15,8 @@
 
 static void vm_recovery_msg_handler(uint32_t event, uint64_t data);
 CPU_MSG_HANDLER(vm_recovery_msg_handler, VM_RECOVERY_MSG_ID);
+
+static void vm_recovery_slave_execute(struct vm *vm);
 #else
 /* Test build: headers and stubs provided by the test file */
 #endif
@@ -48,7 +50,7 @@ void vm_recovery_start(struct vm *vm)
          vm->id, vm->health.recovery_count);
 #endif
 
-    /* Send VM_RESET IPI to all remote vCPUs of this VM */
+    /* Send VM_RESET IPI to all other vCPUs of this VM */
     struct cpu_msg msg = {
         .handler = VM_RECOVERY_MSG_ID,
         .event = VM_RESET,
@@ -56,14 +58,11 @@ void vm_recovery_start(struct vm *vm)
     };
     vm_msg_broadcast(vm, &msg);
 
-    /* Execute recovery immediately on master CPU.
-     * The interrupt return path (exceptions.S) goes directly to
-     * vcpu_arch_entry without passing through vcpu_arch_run(),
-     * so we cannot defer recovery — we must do it here.
-     * vm_recovery_execute() does not return (calls vcpu_run()). */
+    /* Lead recovery if we are the master core, otherwise join as slave */
     if (cpu()->id == vm->master) {
         vm_recovery_execute(vm);
-        /* does not return */
+    } else {
+        vm_recovery_slave_execute(vm);
     }
 }
 
@@ -99,13 +98,9 @@ void vm_recovery_execute(struct vm *vm)
 }
 
 #ifndef VM_RECOVERY_TEST
-static void vm_recovery_msg_handler(uint32_t event, uint64_t data)
+static void vm_recovery_slave_execute(struct vm *vm)
 {
-    (void)data;
-    if (event != VM_RESET) return;
-
     struct vcpu *vcpu = cpu()->vcpu;
-    struct vm *vm = vcpu->vm;
 
     vcpu->active = false;
 
@@ -122,7 +117,25 @@ static void vm_recovery_msg_handler(uint32_t event, uint64_t data)
     /* 4. Final barrier */
     cpu_sync_barrier(&vm->sync);
 
-    /* 5. Resume */
+    /* 5. Resume — does not return */
     vcpu_run(vcpu);
+}
+
+static void vm_recovery_msg_handler(uint32_t event, uint64_t data)
+{
+    (void)data;
+    if (event != VM_RESET) return;
+
+    struct vcpu *vcpu = cpu()->vcpu;
+    struct vm *vm = vcpu->vm;
+
+    /* If we are the master core receiving a message from a slave that 
+     * detected failure, we must lead the recovery execution.
+     * Otherwise, join as a slave. */
+    if (cpu()->id == vm->master) {
+        vm_recovery_execute(vm);
+    } else {
+        vm_recovery_slave_execute(vm);
+    }
 }
 #endif
