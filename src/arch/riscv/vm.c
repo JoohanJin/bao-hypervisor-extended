@@ -10,6 +10,7 @@
 #include <arch/instructions.h>
 #include <string.h>
 #include <config.h>
+#include <arch/sbi.h>
 
 void vm_arch_init(struct vm *vm, const struct vm_config *config)
 {
@@ -31,6 +32,17 @@ void vcpu_arch_init(struct vcpu *vcpu, struct vm *vm) {
 
 void vcpu_arch_reset(struct vcpu *vcpu, vaddr_t entry)
 {
+    /* 
+     * Ensure any previous memory stores (like image re-installation) 
+     * are visible and that the I-cache is synchronized before 
+     * entering the guest. 
+     *
+     * We perform this locally on EVERY vCPU (master and remote) to 
+     * avoid deadlocks with remote SBI IPIs during synchronization 
+     * barriers in the recovery path.
+     */
+    asm volatile("fence rw, rw; fence.i" ::: "memory");
+
     memset(&vcpu->regs, 0, sizeof(struct arch_regs));
     
     CSRW(sscratch, &vcpu->regs);
@@ -82,4 +94,11 @@ void vcpu_arch_run(struct vcpu *vcpu){
     } else {
         cpu_idle();
     }
+}
+
+void vm_arch_reinstall_image(struct vm* vm)
+{
+    /* 
+     * Synchronization is handled locally by all vCPUs in vcpu_arch_reset.
+     */
 }

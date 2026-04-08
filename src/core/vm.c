@@ -300,6 +300,12 @@ void vm_reinstall_image(struct vm* vm)
             break;
         }
     }
+
+    vm_arch_reinstall_image(vm);
+}
+
+__attribute__((weak)) void vm_arch_reinstall_image(struct vm* vm)
+{
 }
 
 void vm_emul_add_mem(struct vm* vm, struct emul_mem* emu)

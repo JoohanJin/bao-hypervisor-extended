@@ -208,6 +208,7 @@ void vm_mem_prot_init(struct vm* vm, const struct vm_config* config);
 /* ------------------------------------------------------------*/
 
 void vm_arch_init(struct vm* vm, const struct vm_config* config);
+void vm_arch_reinstall_image(struct vm* vm);
 void vcpu_arch_init(struct vcpu* vcpu, struct vm* vm);
 void vcpu_run(struct vcpu* vcpu);
 unsigned long vcpu_readreg(struct vcpu* vcpu, unsigned long reg);
