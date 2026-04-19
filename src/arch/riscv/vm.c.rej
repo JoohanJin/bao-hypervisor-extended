@@ -1,0 +1,15 @@
+@@ -81,11 +87,6 @@
+ 
+ void vm_arch_reinstall_image(struct vm* vm)
+ {
+-    /* Data fence is required to ensure memcpy stores are visible 
+-     * to other harts before they execute fence.i */
+-    asm volatile("fence rw, rw\n\t"
+-                 "fence.i" ::: "memory");
+-    cpumap_t pcpus = vm->cpus & ~(1UL << cpu()->id);
+-    if (pcpus) {
+-        sbi_remote_fence_i(pcpus, 0);
+-    }
++    /* We now handle synchronization locally in vcpu_arch_reset
++     * to avoid deadlocks with remote SBI IPIs during barriers.
++     */

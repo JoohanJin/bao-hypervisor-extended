@@ -13,12 +13,10 @@
 #include <health_monitor.h>
 #include <printk.h>
 
-#ifdef BAO_RECOVERY
 static void vm_recovery_msg_handler(uint32_t event, uint64_t data);
 CPU_MSG_HANDLER(vm_recovery_msg_handler, VM_RECOVERY_MSG_ID);
 
 static void vm_recovery_slave_execute(struct vm *vm);
-#endif
 #else
 /* Test build: headers and stubs provided by the test file */
 #endif
@@ -74,7 +72,6 @@ void vm_recovery_start(struct vm *vm)
 #endif
 }
 
-#ifdef BAO_RECOVERY
 void vm_recovery_execute(struct vm *vm)
 {
     struct vcpu *vcpu = cpu()->vcpu;
@@ -147,5 +144,4 @@ static void vm_recovery_msg_handler(uint32_t event, uint64_t data)
         vm_recovery_slave_execute(vm);
     }
 }
-#endif
 #endif
